@@ -39,23 +39,22 @@ The complete website for the **Free Live In-Person Session** (Saturday, November
 
 ## Why this stack
 
-The brief suggested Next.js + Supabase. This build uses **plain Node.js 22 with zero npm dependencies** and its built-in SQLite database instead:
+The brief suggested Next.js + Supabase. This build is **plain JavaScript with zero npm dependencies**, written as one standard web request handler:
 
-- **Nothing to install or keep patched** — no `node_modules`, no supply-chain risk, no framework upgrades before the event.
-- **One small server, one database file** — easy to host, back up and reason about. Comfortably handles thousands of RSVPs.
-- Stripe, Resend and Twilio are called through their official REST APIs (no SDK needed).
-- It was fully built **and tested** in this environment (which can't download npm packages), so what you're getting is verified, not theoretical.
-
-Trade-off: it runs as a single server with a persistent disk (Render, Railway, Fly.io, any VPS) rather than on serverless platforms like Vercel.
-
----
+- **Free hosting:** it runs on **Cloudflare Workers + D1** (Cloudflare's SQLite database) on the free plan: 100,000 requests a day, 5 GB of data, automatic backups (D1 Time Travel), no cold starts, and a free `*.workers.dev` address.
+- **Same code on Node:** `server.mjs` runs the identical app on Node 22 with its built-in SQLite, for local development, tests, or any VPS/Render host.
+- **Nothing to keep patched:** no `node_modules`, no framework upgrades before the event. Stripe, Resend and Twilio are called through their REST APIs.
+- **Safe without transactions:** D1 has no interactive transactions, so every multi-step payment write is one atomic batch guarded by a claim token, with UNIQUE constraints as a second guard. A test fires duplicate webhooks in parallel to prove entries are only ever awarded once.
 
 ## Project structure
 
 ```
-server.mjs                 HTTP server, router, static files, security headers, background worker
+server.mjs                 Node entry point (local, tests, VPS)
 src/config.mjs             environment settings
-src/db.mjs                 SQLite connection, migrations, transactions
+worker.mjs                 Cloudflare Workers entry point
+src/app.mjs                the whole site as one fetch handler + first-run setup + scheduled job
+src/db.mjs                 D1 access, atomic batches, migrations
+src/d1-sqlite.mjs          D1-compatible wrapper over Node's built-in SQLite
 src/migrations/            database schema (15+ tables, constraints, append-only triggers)
 src/lib/
   rsvp.mjs                 registration, access links, referral attribution & abuse checks
@@ -70,58 +69,58 @@ src/routes/admin.mjs       dashboard
 src/views/                 page templates
 public/                    CSS, JS, fonts (self-hosted), images
 scripts/                   create-admin, migrate, backup
-tests/run-scenarios.mjs    end-to-end tests (17 scenarios) with a local Stripe stand-in
+tests/run-scenarios.mjs    end-to-end tests (18 scenarios) with a local Stripe stand-in
 tests/browser-check.py     real-browser check on phone/tablet/laptop/desktop
 ```
 
 ---
 
-## Run it on your computer
+## Publish it free on Cloudflare
+
+1. Push this folder to a GitHub repository (private is fine).
+2. In the Cloudflare dashboard: **Workers & Pages → Create → Import a repository**, pick the repo, keep the defaults and **Deploy**. Cloudflare reads `wrangler.toml`, creates the D1 database automatically, and gives you `https://klee-ruben-live.<your-subdomain>.workers.dev`. Every push to GitHub redeploys.
+3. Create your organizer login: open `https://<your-site>/admin/setup?code=<SETUP_CODE from wrangler.toml>`. The link stops working once the first account exists.
+4. Add secrets under **Workers & Pages → klee-ruben-live → Settings → Variables and Secrets** (type: Secret):
+   - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (webhook URL: `https://<your-site>/webhooks/stripe`)
+   - `RESEND_API_KEY`, and `EMAIL_FROM` (e.g. `Klee & Ruben Live <hello@yourdomain.com>`)
+   - optional: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`
+   - optional: `BASE_URL` once you attach a custom domain (otherwise the site uses the address it's visited at)
+5. Sign in at `/admin` and work through the **Launch checklist** on the overview page.
+
+`APP_SECRET` is optional on Cloudflare: if it's missing, a random one is generated on first launch and kept in the database.
+
+**Free-plan notes:** emails and texts are sent by a job that runs every minute, about 40 per minute. A broadcast to 600 people finishes in roughly 15 minutes, and the Messages page shows progress. Resend's free plan allows 100 emails a day / 3,000 a month; upgrade it for large blasts.
+
+## Run it on your computer (or any Node host)
 
 Requires **Node.js 22.13 or newer** (`node -v`).
 
 ```bash
-cp .env.example .env          # then set BASE_URL=http://localhost:3000 and APP_SECRET
+cp .env.example .env          # set BASE_URL=http://localhost:3000
 npm run admin:create -- --email you@example.com --name "Klee" --role owner
 npm start                     # → http://localhost:3000   dashboard: /admin
 ```
 
-Run the tests: `npm test` (and optionally `python3 tests/browser-check.py http://localhost:3000` with Playwright installed).
-
----
-
-## Publish it (Render example, ~15 minutes)
-
-1. Put this folder in a GitHub repository.
-2. On [render.com](https://render.com): **New → Blueprint**, pick the repo. `render.yaml` creates the web service with a persistent disk. (Any Docker host works too — mount a volume at `/data`.)
-3. Set `BASE_URL` to your domain (e.g. `https://kleeandrubenlive.com`), add your custom domain in Render, and point your DNS at it.
-4. Open Render's shell and create the owner account:
-   `node --disable-warning=ExperimentalWarning scripts/create-admin.mjs --email you@example.com --name "Klee" --role owner`
-5. Sign in at `/admin` and work through the **Launch checklist** on the overview page.
+Tests: `npm test` (18 end-to-end scenarios against the real app with a local stand-in for Stripe) and optionally `python3 tests/browser-check.py http://localhost:3000` with Playwright installed. `Dockerfile` and `render.yaml` remain for Node hosts that keep a persistent disk.
 
 ### Stripe
 1. Stripe Dashboard → Developers → API keys: copy the **test** secret key into `STRIPE_SECRET_KEY`.
-2. Developers → Webhooks → Add endpoint `https://YOURDOMAIN.com/webhooks/stripe` with the events listed in `.env.example`; copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
-3. Do a test purchase with card `4242 4242 4242 4242`, then refund it in Stripe and watch the dashboard update.
+2. Developers → Webhooks → Add endpoint `https://<your-site>/webhooks/stripe` with the events listed in `.env.example`; copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
+3. Make a test purchase with card `4242 4242 4242 4242`, then refund it in Stripe and watch the dashboard update.
 4. Switch to live keys only after compliance approval.
 
 ### Email (Resend) and SMS (Twilio)
-Verify your domain in Resend, then set `RESEND_API_KEY` and `EMAIL_FROM`. For texts, set the three `TWILIO_*` values (U.S. numbers need A2P 10DLC registration). Until configured, messages are logged as "not configured" — never as sent — and the confirmation screen tells people to save their confirmation number.
-
-### Backups
-`npm run backup` writes a consistent snapshot of the database. Schedule it (or use your host's disk snapshots) — especially the week of the event.
-
----
+Verify your domain in Resend, then set `RESEND_API_KEY` and `EMAIL_FROM`. For texts, set the three `TWILIO_*` values (U.S. numbers need A2P 10DLC registration). Until these are configured, messages are logged as "not configured" — never as sent — and the confirmation screen tells people to save their confirmation number.
 
 ## What only you can provide
 
 | Item | Where |
 |---|---|
-| Domain | `BASE_URL` + DNS |
+| Domain (optional) | Cloudflare → your Worker → Settings → Domains & Routes |
 | Venue name, address, directions | Dashboard → Settings → Event |
 | Instagram handle, phone, email, Facebook/TikTok/WhatsApp | Dashboard → Settings → Contact & social |
-| Stripe account + keys + webhook | Environment variables |
-| Resend (and optional Twilio) | Environment variables |
+| Stripe account + keys + webhook | Cloudflare → Variables and Secrets |
+| Resend (and optional Twilio) | Cloudflare → Variables and Secrets |
 | Flight prize details (airline, value, dates, restrictions) | Dashboard → Prizes → set to "Confirmed" only when verified |
 | Raffle legal review, drawing method, eligible states, free-entry method | Dashboard → Settings → Raffle + Raffle compliance |
 | Final privacy policy, terms, rules, refund policy | Dashboard → Settings → Policies (drafts included, marked for review) |
