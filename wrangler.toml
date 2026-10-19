@@ -1,0 +1,26 @@
+# Cloudflare Workers (free plan). Deployed automatically from GitHub by Cloudflare Workers Builds.
+name = "klee-ruben-live"
+main = "worker.mjs"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# CSS, JavaScript, fonts and images are served straight from Cloudflare's edge.
+[assets]
+directory = "./public"
+
+# The database (SQLite). Created automatically on the first deploy.
+[[d1_databases]]
+binding = "DB"
+database_name = "klee-ruben-live"
+
+# Every minute: send queued emails/texts, queue event reminders, housekeeping.
+[triggers]
+crons = ["* * * * *"]
+
+[observability]
+enabled = true
+
+[vars]
+# One-time link for creating the first organizer login: /admin/setup?code=<this value>.
+# It stops working as soon as the first account exists.
+SETUP_CODE = "eIV5xj8l-UOs"

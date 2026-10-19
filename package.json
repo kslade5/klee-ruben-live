@@ -1,0 +1,17 @@
+{
+  "name": "klee-ruben-live",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Event website for Klee & Ruben's free live in-person session: RSVPs, referrals, raffle checkout and organizer dashboard. Runs on Cloudflare Workers + D1 (free) or Node.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.mjs",
+    "dev": "node --disable-warning=ExperimentalWarning --watch server.mjs",
+    "admin:create": "node --disable-warning=ExperimentalWarning scripts/create-admin.mjs",
+    "backup": "node --disable-warning=ExperimentalWarning scripts/backup.mjs",
+    "test": "node --disable-warning=ExperimentalWarning tests/run-scenarios.mjs"
+  }
+}

@@ -1,0 +1,30 @@
+# One-click deploy on Render (render.com): New → Blueprint → select this repo.
+services:
+  - type: web
+    name: klee-ruben-live
+    runtime: docker
+    plan: starter          # a paid plan is required for a persistent disk
+    healthCheckPath: /healthz
+    disk:
+      name: event-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: BASE_URL
+        sync: false
+      - key: APP_SECRET
+        generateValue: true
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: TRUST_PROXY
+        value: "1"
+      - key: ADMIN_EMAIL        # your dashboard login (created on first launch)
+        sync: false
+      - key: ADMIN_PASSWORD     # 12+ characters; you can delete it after first launch
+        sync: false
