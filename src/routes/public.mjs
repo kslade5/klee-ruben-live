@@ -251,6 +251,13 @@ export const publicRoutes = {
   'GET /terms': async (req, res) => sendHtml(res, contentPage('terms', 'Terms and conditions', '/terms')),
   'GET /refund-policy': async (req, res) => sendHtml(res, contentPage('refund_policy', 'Refund policy', '/refund-policy')),
   'GET /contact': async (req, res) => redirect(res, '/#contact', 302),
+
+  // Short address printed on flyers and QR codes: goes straight to the RSVP form.
+  // /rsvp?src=church-name tags the RSVPs so the dashboard shows which flyer or group they came from.
+  'GET /rsvp': async (req, res, url) => {
+    const src = String(url.searchParams.get('src') || 'flyer').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40) || 'flyer';
+    redirect(res, `/?utm_source=${encodeURIComponent(src)}&utm_medium=flyer#rsvp`, 302);
+  },
   'GET /robots.txt': async (req, res) => send(res, 200, `User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /me\nDisallow: /api/\nDisallow: /raffle/\nSitemap: ${config.baseUrl}/sitemap.xml\n`, { 'Content-Type': 'text/plain' }),
   'GET /sitemap.xml': async (req, res) => {
     const urls = ['/', '/rules/raffle', '/rules/event', '/privacy', '/terms', '/refund-policy'];
