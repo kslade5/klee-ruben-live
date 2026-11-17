@@ -8,6 +8,7 @@ export const DEFAULTS = {
   event: {
     name: 'Free Live In-Person Session',
     hosts: 'Klee & Ruben',
+    postponed: true, // date TBA: hides the date/countdown, keeps RSVPs open, pauses reminders and raffle
     start_local: '2026-11-21T18:00',
     end_local: '2026-11-21T21:00',
     timezone: 'America/New_York',
@@ -149,6 +150,8 @@ export async function setSettingsGroup(group, patch, actor) {
   await loadSettings(true);
   return { before: current, after: next };
 }
+
+export const isPostponed = (s = getSettings()) => Boolean(s.event.postponed);
 
 export function eventTimes(s = getSettings()) {
   const tz = s.event.timezone;

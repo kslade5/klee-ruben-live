@@ -27,11 +27,12 @@ export function raffleGate() {
   const s = getSettings();
   const { raffleClose } = eventTimes(s);
   const reasons = [];
+  if (s.event.postponed) reasons.push('postponed');
   if (!s.raffle.compliance_approved) reasons.push('compliance');
   if (!s.raffle.sales_enabled) reasons.push('disabled');
   if (!integrations.stripe()) reasons.push('payments_not_configured');
-  if (Date.now() >= raffleClose.getTime()) reasons.push('closed');
-  const publicMessage = reasons.includes('closed') ? 'Online raffle sales are closed.' : 'Raffle entry sales open soon.';
+  if (!s.event.postponed && Date.now() >= raffleClose.getTime()) reasons.push('closed');
+  const publicMessage = reasons.includes('postponed') ? 'Raffle sales are paused while the event is postponed.' : reasons.includes('closed') ? 'Online raffle sales are closed.' : 'Raffle entry sales open soon.';
   return { open: reasons.length === 0, reasons, publicMessage, closesAt: raffleClose };
 }
 

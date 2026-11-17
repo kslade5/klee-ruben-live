@@ -17,7 +17,7 @@ export function layout({ title, description, body, path = '/', bodyClass = '', n
     description: desc,
     startDate: start.toISOString(),
     endDate: end.toISOString(),
-    eventStatus: 'https://schema.org/EventScheduled',
+    eventStatus: s.event.postponed ? 'https://schema.org/EventPostponed' : 'https://schema.org/EventScheduled',
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     location: { '@type': 'Place', name: s.event.venue_name || 'Venue to be announced', address: { '@type': 'PostalAddress', streetAddress: s.event.venue_address || undefined, addressRegion: 'MD', addressCountry: 'US' } },
     image: [`${config.baseUrl}/img/og.jpg`],

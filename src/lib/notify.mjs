@@ -95,6 +95,7 @@ function contactLines() {
 
 function whenText() {
   const s = getSettings();
+  if (s.event.postponed) return 'Postponed — new date to be announced';
   const { start, end } = eventTimes(s);
   const day = formatInZone(start, s.event.timezone, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   const t1 = formatInZone(start, s.event.timezone, { hour: 'numeric', minute: '2-digit' });
@@ -130,8 +131,7 @@ export async function sendRsvpConfirmation(att, rsvp, { accessToken, referralCod
     rsvp.guests_count ? `Additional guests: ${rsvp.guests_count}` : null,
     ``,
     `Your private page (raffle entries, referrals, update your details): ${meUrl}`,
-    `Add to Google Calendar: ${googleCalendarUrl()}`,
-    `Calendar file: ${config.baseUrl}/event.ics`,
+    ...(s.event.postponed ? [] : [`Add to Google Calendar: ${googleCalendarUrl()}`, `Calendar file: ${config.baseUrl}/event.ics`]),
     ``,
     `Invite friends with your personal link: ${refUrl}`,
     `When someone RSVPs with your link and completes a qualifying raffle purchase, you earn ${s.referral.bonus_entries} bonus raffle entries (see the raffle rules).`,
@@ -143,7 +143,7 @@ export async function sendRsvpConfirmation(att, rsvp, { accessToken, referralCod
 <p style="font-size:14px;color:#9fb0c6;margin:0">Confirmation number</p>
 <p style="font-size:24px;font-weight:bold;letter-spacing:2px;color:#FFC531;margin:2px 0 14px">${esc(rsvp.confirmation_no)}</p>
 <p><strong style="color:#fff">When:</strong> ${esc(whenText())}<br><strong style="color:#fff">Where:</strong> ${esc(venueText(s))}${rsvp.guests_count ? `<br><strong style="color:#fff">Additional guests:</strong> ${rsvp.guests_count}` : ''}</p>
-<p>${btn(meUrl, 'Open my event page')}${btn(googleCalendarUrl(), 'Add to calendar')}</p>
+<p>${btn(meUrl, 'Open my event page')}${s.event.postponed ? '' : btn(googleCalendarUrl(), 'Add to calendar')}</p>
 <p><strong style="color:#fff">Invite friends:</strong> share your personal link<br><a href="${esc(refUrl)}" style="color:#3DE0FF">${esc(refUrl)}</a><br>
 When someone RSVPs with your link and completes a qualifying raffle purchase, you earn ${s.referral.bonus_entries} bonus raffle entries, subject to the <a href="${esc(config.baseUrl)}/rules/raffle" style="color:#3DE0FF">raffle rules</a>.</p>
 <p style="color:#9fb0c6;font-size:14px">${contactLines().map(esc).join('<br>')}</p>
@@ -194,6 +194,7 @@ export async function sendReferralBonus(referrer, entries, referredFirstName) {
 
 export async function queueReminders() {
   const s = getSettings();
+  if (s.event.postponed) return 0; // never send "see you tomorrow" for a postponed event
   const { start } = eventTimes(s);
   const t = Date.now();
   if (t >= start.getTime()) return 0;
@@ -213,12 +214,14 @@ export async function queueReminders() {
   return enqueueMany(msgs);
 }
 
-export async function broadcastUpdate({ subject, message, includeSms, broadcastId }) {
+export async function broadcastUpdate({ subject, message, includeSms, broadcastId, flyer = '' }) {
   const rows = await all(`SELECT a.* FROM attendees a JOIN rsvps r ON r.attendee_id = a.id WHERE r.status = 'confirmed'`);
   const msgs = [];
   for (const a of rows) {
-    msgs.push({ attendeeId: a.id, channel: 'email', template: 'event_update', to: a.email, subject, text: message, html: emailShell(subject, `<p>${esc(message).replace(/\n/g, '<br>')}</p>`), dedupeKey: `update:${broadcastId}:email:${a.id}` });
-    if (includeSms && a.sms_opt_in) msgs.push({ attendeeId: a.id, channel: 'sms', template: 'event_update', to: a.phone_norm, text: `${subject}: ${message}`.slice(0, 600) + ' Reply STOP to opt out.', dedupeKey: `update:${broadcastId}:sms:${a.id}` });
+    const flyerUrl = flyer ? `${config.baseUrl}${flyer}` : '';
+    const img = flyerUrl ? `<p style="margin:20px 0 0"><a href="${esc(flyerUrl)}"><img src="${esc(flyerUrl)}" width="480" alt="Event flyer" style="display:block;width:100%;max-width:480px;height:auto;border-radius:12px"></a></p>` : '';
+    msgs.push({ attendeeId: a.id, channel: 'email', template: 'event_update', to: a.email, subject, text: flyerUrl ? `${message}\n\nFlyer: ${flyerUrl}` : message, html: emailShell(subject, `<p>${esc(message).replace(/\n/g, '<br>')}</p>${img}`), dedupeKey: `update:${broadcastId}:email:${a.id}` });
+    if (includeSms && a.sms_opt_in) msgs.push({ attendeeId: a.id, channel: 'sms', template: 'event_update', to: a.phone_norm, text: `${subject}: ${message}`.slice(0, 520) + (flyerUrl ? ` Flyer: ${flyerUrl}` : '') + ' Reply STOP to opt out.', dedupeKey: `update:${broadcastId}:sms:${a.id}` });
   }
   await enqueueMany(msgs);
   return rows.length;

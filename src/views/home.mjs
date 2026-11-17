@@ -1,3 +1,4 @@
+import { shareText } from './pages.mjs';
 import { html, raw, richText } from '../lib/html.mjs';
 import { layout, siteFooter, icon, bootData, asset } from './layout.mjs';
 import { getSettings, eventTimes } from '../lib/settings.mjs';
@@ -75,6 +76,7 @@ export function homePage({ prizes, faqs, attendee, referrer, gate, rsvpState, rs
   const showCount = s.public.show_rsvp_count && rsvpCount >= s.public.rsvp_count_min;
   const states = eligibleStates(s);
   const bonus = s.referral.bonus_entries;
+  const postponed = s.event.postponed;
 
   const body = html`
 ${nav()}
@@ -84,7 +86,7 @@ ${nav()}
   <div class="hero__bg" aria-hidden="true"><div class="brick"></div><div class="beam beam--blue"></div><div class="beam beam--gold"></div><canvas class="dust" data-dust></canvas></div>
   <div class="wrap hero__grid">
     <div class="hero__copy">
-      <p class="chip"><span class="chip__dot"></span>Maryland • Live in person</p>
+      ${postponed ? html`<p class="chip chip--alert"><span class="chip__dot"></span>Postponed • New date coming soon</p>` : html`<p class="chip"><span class="chip__dot"></span>Maryland • Live in person</p>`}
       <h1 class="hero__title" id="hero-title">
         <span class="t-invite">You’re invited to a</span>
         <span class="t-row"><span class="t-free">Free</span><span class="t-live">Live</span></span>
@@ -93,19 +95,23 @@ ${nav()}
       <p class="hero__slogan">Learn trading &amp; get your credit fixed for free</p>
       <p class="hero__hosts">Hosted by <strong>Klee</strong> &amp; <strong>Ruben</strong></p>
       <ul class="facts" aria-label="Event details">
-        <li>${icon('calendar')}<span>${formatInZone(start, tz, { month: 'long', day: 'numeric', year: 'numeric' })}</span></li>
-        <li>${icon('clock')}<span>${timeRange}</span></li>
+        ${postponed
+          ? html`<li class="facts__alert">${icon('calendar')}<span><s>${formatInZone(start, tz, { month: 'long', day: 'numeric' })}</s> Postponed · new date TBA</span></li>`
+          : html`<li>${icon('calendar')}<span>${formatInZone(start, tz, { month: 'long', day: 'numeric', year: 'numeric' })}</span></li>
+        <li>${icon('clock')}<span>${timeRange}</span></li>`}
         <li>${icon('pin')}<span>${venueSet ? venue : 'Maryland — venue details coming soon'}</span></li>
       </ul>
-      <div class="cd cd--hero" data-countdown aria-live="off">
+      ${postponed
+        ? html`<p class="postponed-note">Already RSVP’d? You’re still on the list — you’ll hear the new date first. Not signed up yet? RSVP now to be the first to know.</p>`
+        : html`<div class="cd cd--hero" data-countdown aria-live="off">
         <div><b data-u="d">--</b><span>days</span></div>
         <div><b data-u="h">--</b><span>hrs</span></div>
         <div><b data-u="m">--</b><span>min</span></div>
         <div><b data-u="s">--</b><span>sec</span></div>
         <p class="cd__msg" data-cd-msg hidden></p>
-      </div>
+      </div>`}
       <div class="hero__ctas">
-        <a class="btn btn--gold btn--lg" href="#rsvp" data-track="rsvp_started">Claim your free spot</a>
+        <a class="btn btn--gold btn--lg" href="#rsvp" data-track="rsvp_started">${postponed ? 'RSVP for the new date' : 'Claim your free spot'}</a>
         <a class="btn btn--ghost btn--lg" href="#experience">Explore the experience</a>
       </div>
     </div>
@@ -122,7 +128,9 @@ ${nav()}
   <div class="wrap">
     <h2 class="sr-only" id="when-title">When and where</h2>
     <div class="board" data-reveal>
-      <div class="board__clock">
+      ${postponed
+        ? html`<div class="board__clock"><p class="board__label">Event update</p><p class="postponed-stamp">Postponed</p><p class="postponed-sub">New date coming soon</p></div>`
+        : html`<div class="board__clock">
         <p class="board__label" data-cd-label>Doors open in</p>
         <div class="cd cd--board" data-countdown>
           <div><b data-u="d">--</b><span>Days</span></div>
@@ -131,16 +139,16 @@ ${nav()}
           <div><b data-u="s">--</b><span>Seconds</span></div>
           <p class="cd__msg" data-cd-msg hidden></p>
         </div>
-      </div>
+      </div>`}
       <dl class="board__facts">
-        <div><dt>${icon('calendar')} When</dt><dd>${dayLong}<br>${timeRange}</dd></div>
+        <div><dt>${icon('calendar')} When</dt><dd>${postponed ? html`<s>${dayLong}</s><br>Postponed — new date to be announced` : html`${dayLong}<br>${timeRange}`}</dd></div>
         <div><dt>${icon('pin')} Where</dt><dd>${venue}${s.event.venue_directions_url ? html`<br><a href="${s.event.venue_directions_url}" target="_blank" rel="noopener">Get directions</a>` : ''}</dd></div>
         <div><dt>${icon('check')} Admission</dt><dd>Free with RSVP. Kids &amp; teens 8+ welcome.</dd></div>
       </dl>
-      <div class="board__actions">
+      ${postponed ? html`<div class="board__actions"><a class="btn btn--gold" href="#rsvp">RSVP to hear the new date first</a></div>` : html`<div class="board__actions">
         <a class="btn btn--ghost" href="${googleCalendarUrl()}" target="_blank" rel="noopener">${icon('calendar')} Add to Google Calendar</a>
         <a class="btn btn--ghost" href="/event.ics" download="klee-ruben-live.ics">Download calendar invite (.ics)</a>
-      </div>
+      </div>`}
     </div>
   </div>
 </section>
@@ -325,7 +333,7 @@ ${nav()}
 
 <section class="finale" aria-labelledby="finale-title">
   <div class="wrap finale__inner" data-reveal>
-    <p class="finale__date">${formatInZone(start, tz, { month: 'short', day: 'numeric' })}</p>
+    <p class="finale__date">${postponed ? 'Soon' : formatInZone(start, tz, { month: 'short', day: 'numeric' })}</p>
     <h2 class="finale__title" id="finale-title">Pull up. Bring a friend. Leave knowing more.</h2>
     ${showCount ? html`<p class="finale__count"><b data-countup="${rsvpCount}">${rsvpCount}</b> people have RSVPed</p>` : ''}
     <a class="btn btn--gold btn--lg" href="#rsvp">Claim your free spot</a>
@@ -333,21 +341,21 @@ ${nav()}
 </section>
 </main>
 ${siteFooter()}
-${attendee ? '' : html`<a class="sticky-cta" href="#rsvp" data-sticky-cta>RSVP free — ${formatInZone(start, tz, { month: 'short', day: 'numeric' })}</a>`}
+${attendee ? '' : html`<a class="sticky-cta" href="#rsvp" data-sticky-cta>${postponed ? 'RSVP free — new date soon' : html`RSVP free — ${formatInZone(start, tz, { month: 'short', day: 'numeric' })}`}</a>`}
 ${bootData({
-    start: start.getTime(),
+    start: postponed ? null : start.getTime(),
     end: end.getTime(),
     serverNow: Date.now(),
     raffleOpen: gate.open,
     hasAttendee: Boolean(attendee),
     maxEntries: s.raffle.max_entries_per_purchase,
     bonus,
-    shareText: `I’m going to this FREE live event in Maryland on ${formatInZone(start, tz, { month: 'long', day: 'numeric' })}! Trading education, credit education, food, games, prizes, live performances, and networking. RSVP here:`,
+    shareText: shareText(s),
     baseUrl: config.baseUrl,
   })}`;
 
   return layout({
-    title: `Free Live In-Person Session — Klee & Ruben | ${formatInZone(start, tz, { month: 'short', day: 'numeric' })}, Maryland`,
+    title: postponed ? 'Postponed: Free Live In-Person Session — Klee & Ruben | New date coming soon' : `Free Live In-Person Session — Klee & Ruben | ${formatInZone(start, tz, { month: 'short', day: 'numeric' })}, Maryland`,
     body,
     path: '/',
     extraHead: turnstileSiteKey ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : '',

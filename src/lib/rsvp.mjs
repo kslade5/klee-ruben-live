@@ -61,7 +61,7 @@ const headcount = async () => (await one(`SELECT COALESCE(SUM(1 + guests_count),
 export async function rsvpOpenState() {
   const s = getSettings();
   const { rsvpClose } = eventTimes(s);
-  if (Date.now() >= rsvpClose.getTime()) return { open: false, reason: 'RSVPs are closed.' };
+  if (!s.event.postponed && Date.now() >= rsvpClose.getTime()) return { open: false, reason: 'RSVPs are closed.' };
   if (s.event.capacity > 0 && (await headcount()) >= s.event.capacity) return { open: false, reason: 'This event is at capacity.' };
   return { open: true };
 }

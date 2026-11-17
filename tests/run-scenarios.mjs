@@ -103,6 +103,8 @@ async function main() {
   const env = { ...process.env, PORT: String(PORT), BASE_URL: BASE, DATABASE_PATH: DB, APP_SECRET: crypto.randomBytes(24).toString('hex'), DISABLE_WORKER: '1',
     STRIPE_SECRET_KEY: 'sk_test_mock', STRIPE_WEBHOOK_SECRET: WHSEC, STRIPE_API_BASE: `http://localhost:${STRIPE_PORT}`, ENV_FILE: '/dev/null', TRUST_PROXY: '1' };
   execFileSync(process.execPath, ['--disable-warning=ExperimentalWarning', 'scripts/create-admin.mjs', '--email', ADMIN_EMAIL, '--name', 'Test Owner', '--role', 'owner'], { cwd: ROOT, env: { ...env, ADMIN_PASSWORD: ADMIN_PW }, stdio: 'pipe' });
+  // The live default is "postponed"; these scenarios exercise the dated event.
+  { const d = new DatabaseSync(DB); d.prepare("INSERT INTO settings (key, value, updated_at, updated_by) VALUES ('event', ?, datetime('now'), 'test') ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify({ postponed: false })); d.close(); }
   const server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'server.mjs'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = '';
   server.stdout.on('data', (d) => (log += d)); server.stderr.on('data', (d) => (log += d));

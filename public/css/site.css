@@ -493,3 +493,12 @@ section { position: relative; }
 
 /* Keep anchored sections and the confirmation clear of the fixed nav */
 section[id], .confirm, #contact { scroll-margin-top: 76px; }
+
+/* Postponed mode */
+.chip--alert{background:#d62828;color:#fff;border-color:#d62828}
+.chip--alert .chip__dot{background:#fff}
+.facts__alert{color:#fff}
+.facts__alert s{opacity:.6;text-decoration-color:#d62828;text-decoration-thickness:3px}
+.postponed-note{max-width:34rem;margin:1rem 0;padding:.9rem 1.1rem;border-left:4px solid #f2a713;background:rgba(0,0,0,.45);font-weight:600;line-height:1.45}
+.postponed-stamp{display:inline-block;margin:.4rem 0;padding:.1em .35em;border:5px solid #d62828;border-radius:10px;color:#d62828;font-family:Anton,Impact,sans-serif;font-size:clamp(2.6rem,7vw,4.5rem);line-height:1;text-transform:uppercase;transform:rotate(-4deg)}
+.postponed-sub{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.4rem;text-transform:uppercase;letter-spacing:.06em}

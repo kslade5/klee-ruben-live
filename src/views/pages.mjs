@@ -81,8 +81,8 @@ export function mePage({ att, stats, totals, purchases, gate }) {
     <header class="me__head">
       <p class="chip"><span class="chip__dot"></span>${att.rsvp_status === 'confirmed' ? 'You’re registered' : 'Registration cancelled'}</p>
       <h1>Hey ${att.first_name}.</h1>
-      <p class="me__conf">Confirmation <b>${att.confirmation_no}</b> · ${formatInZone(start, s.event.timezone, { weekday: 'short', month: 'short', day: 'numeric' })}, ${formatInZone(start, s.event.timezone, { hour: 'numeric' })}–${formatInZone(end, s.event.timezone, { hour: 'numeric', timeZoneName: 'short' })} · ${venueText(s)}</p>
-      <div class="me__actions"><a class="btn btn--ghost btn--sm" href="${googleCalendarUrl()}" target="_blank" rel="noopener">${icon('calendar')} Add to calendar</a><a class="btn btn--ghost btn--sm" href="/event.ics">Download .ics</a></div>
+      ${s.event.postponed ? html`<p class="me__conf">Confirmation <b>${att.confirmation_no}</b> · <strong>Postponed — new date coming soon.</strong> You’re still on the list; we’ll contact you with the new date.</p>` : html`<p class="me__conf">Confirmation <b>${att.confirmation_no}</b> · ${formatInZone(start, s.event.timezone, { weekday: 'short', month: 'short', day: 'numeric' })}, ${formatInZone(start, s.event.timezone, { hour: 'numeric' })}–${formatInZone(end, s.event.timezone, { hour: 'numeric', timeZoneName: 'short' })} · ${venueText(s)}</p>
+      <div class="me__actions"><a class="btn btn--ghost btn--sm" href="${googleCalendarUrl()}" target="_blank" rel="noopener">${icon('calendar')} Add to calendar</a><a class="btn btn--ghost btn--sm" href="/event.ics">Download .ics</a></div>`}
       <p class="tiny">Bookmark this page — it’s private to you. Don’t share this page’s link; share your invite link below instead.</p>
     </header>
 
@@ -161,6 +161,7 @@ const f = (name, label, value, type = 'text') => html`<div class="field"><label 
 
 export const shareText = (s = getSettings()) => {
   const { start } = eventTimes(s);
+  if (s.event.postponed) return `I just RSVP’d to this FREE live event in Maryland — new date coming soon! Trading education, credit education, food, games, prizes, live performances, and networking. RSVP here to hear the date first:`;
   return `I’m going to this FREE live event in Maryland on ${formatInZone(start, s.event.timezone, { month: 'long', day: 'numeric' })}! Trading education, credit education, food, games, prizes, live performances, and networking. RSVP here:`;
 };
 

@@ -14,10 +14,11 @@ export function confirmationHtml({ attendee, rsvp, referralCode, referredBy }) {
   return String(html`
   <div class="confirm__burst" aria-hidden="true"></div>
   <p class="chip"><span class="chip__dot"></span>You’re registered</p>
-  <h3 class="confirm__title">See you there, ${attendee.first_name}.</h3>
+  <h3 class="confirm__title">${s.event.postponed ? html`You’re on the list, ${attendee.first_name}.` : html`See you there, ${attendee.first_name}.`}</h3>
+  ${s.event.postponed ? html`<p><strong>Heads up: the event is postponed.</strong> Your spot carries over — we’ll send you the new date as soon as it’s set.</p>` : ''}
   <div class="confirm__ticket">
     <div><span>Confirmation</span><b>${rsvp.confirmation_no}</b></div>
-    <div><span>When</span><b>${formatInZone(start, s.event.timezone, { weekday: 'short', month: 'short', day: 'numeric' })}, ${formatInZone(start, s.event.timezone, { hour: 'numeric' })}–${formatInZone(end, s.event.timezone, { hour: 'numeric', timeZoneName: 'short' })}</b></div>
+    <div><span>When</span><b>${s.event.postponed ? 'Postponed — new date TBA' : html`${formatInZone(start, s.event.timezone, { weekday: 'short', month: 'short', day: 'numeric' })}, ${formatInZone(start, s.event.timezone, { hour: 'numeric' })}–${formatInZone(end, s.event.timezone, { hour: 'numeric', timeZoneName: 'short' })}`}</b></div>
     <div><span>Where</span><b>${venueText(s)}</b></div>
     ${rsvp.guests_count ? html`<div><span>Guests</span><b>+${rsvp.guests_count}</b></div>` : ''}
   </div>
@@ -25,8 +26,8 @@ export function confirmationHtml({ attendee, rsvp, referralCode, referredBy }) {
   <p>${integrations.email() ? 'A confirmation email is on its way with your private event page link.' : 'Save your confirmation number. Your private event page is linked below.'}</p>
   <div class="confirm__actions">
     <a class="btn btn--gold" href="/me">Open my event page</a>
-    <a class="btn btn--ghost" href="${googleCalendarUrl()}" target="_blank" rel="noopener">${icon('calendar')} Add to calendar</a>
-    <a class="btn btn--ghost" href="/event.ics">Download .ics</a>
+    ${s.event.postponed ? '' : html`<a class="btn btn--ghost" href="${googleCalendarUrl()}" target="_blank" rel="noopener">${icon('calendar')} Add to calendar</a>
+    <a class="btn btn--ghost" href="/event.ics">Download .ics</a>`}
   </div>
   <h4 class="confirm__h">Invite friends, earn bonus entries</h4>
   <p>When a friend RSVPs with your link and completes a qualifying raffle purchase, you get ${s.referral.bonus_entries} bonus raffle entries. <a href="/rules/raffle">Rules</a></p>

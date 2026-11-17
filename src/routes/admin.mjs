@@ -10,7 +10,7 @@ import { INTERESTS, US_STATES, normalizeEmail, normalizePhone, AGE_GROUPS, HEARD
 import { raffleTotals, approveReward, reverseReward, raffleGate } from '../lib/raffle.mjs';
 import { entryTotals, issueAccessToken } from '../lib/rsvp.mjs';
 import { broadcastUpdate, sendRsvpConfirmation, sendAccessLink, processQueue } from '../lib/notify.mjs';
-import { integrations } from '../config.mjs';
+import { integrations, config } from '../config.mjs';
 import { adminLayout, loginPage, csrf, tile, money, fmtDate, maskEmail, maskPhone, barChart, hbars, statusTag, pager, readiness } from '../views/admin.mjs';
 
 const MSG = {
@@ -137,6 +137,7 @@ async function leaderboard(url) {
 // ---------------- Settings form schema ----------------
 const SETTINGS_FORMS = {
   event: { title: 'Event', role: 'admin', fields: [
+    ['postponed', 'Event is postponed (date TBA): the site hides the date and countdown, keeps RSVPs open, and pauses reminders and raffle sales. Untick and set the new date below when it is confirmed.', 'bool'],
     ['name', 'Event name', 'text'], ['hosts', 'Hosts', 'text'],
     ['start_local', 'Starts (Eastern Time)', 'datetime-local'], ['end_local', 'Ends (Eastern Time)', 'datetime-local'],
     ['venue_name', 'Venue name', 'text', 'Leave blank until announced'], ['venue_address', 'Venue street address', 'text', 'Shown publicly once filled in'],
@@ -280,7 +281,7 @@ export const adminRoutes = {
         ${tile('Referral-driven RSVPs', ref.rsvps)}
         ${tile('Qualifying referral purchases', ref.qualifying, ref.pending ? `${ref.pending} awaiting review` : '')}
         ${tile('Bonus entries awarded', totals.bonus_entries)}
-        ${tile('Days until event', Math.max(0, Math.ceil((start - Date.now()) / 86400_000)))}
+        ${s.event.postponed ? tile('Event date', 'Postponed', 'New date TBA · change in Settings → Event') : tile('Days until event', Math.max(0, Math.ceil((start - Date.now()) / 86400_000)))}
       </section>
       <div class="cols">
         <section class="card"><h2>Launch checklist</h2>${readiness(s)}<p class="hint">Raffle checkout is ${gate.open ? html`<strong class="ok">open</strong>` : html`<strong>closed</strong> (${gate.reasons.join(', ').replace(/_/g, ' ')})`}.</p></section>
@@ -655,17 +656,28 @@ export const adminRoutes = {
     const counts = await all('SELECT status, COUNT(*) AS n FROM notifications GROUP BY status');
     const log = await all('SELECT * FROM notifications ORDER BY id DESC LIMIT 150');
     const confirmed = (await one(`SELECT COUNT(*) AS n FROM rsvps WHERE status = 'confirmed'`)).n;
+    const pp = getSettings().event.postponed;
+    const ppSubject = 'Event update: Klee & Ruben Live is postponed';
+    const ppMessage = `Hey! Quick update from Klee & Ruben: our Free Live In-Person Session that was set for Saturday, Nov 21 is postponed. The new date will be announced soon.\n\nYou don't need to do anything. Your RSVP carries over and you'll hear the new date first. Thank you for rocking with us. Tell a friend to RSVP so they don't miss it: ${config.baseUrl}/rsvp`;
+    const list = canSeePii(admin) ? await all(`SELECT a.first_name, a.last_name, a.email, a.phone_norm, a.sms_opt_in FROM attendees a JOIN rsvps r ON r.attendee_id = a.id WHERE r.status = 'confirmed' ORDER BY a.id`) : [];
     page(res, admin, url, 'Messages', 'messages', html`
       <section class="tiles">${counts.length ? counts.map((c) => tile(c.status.replace('_', ' '), c.n)) : tile('Messages', 0)}</section>
       ${!integrations.email() ? html`<p class="flash flash--warn">Email isn’t configured, so messages are logged as “not configured” and not delivered. Set RESEND_API_KEY and EMAIL_FROM.</p>` : ''}
       ${canSeePii(admin) ? html`<form class="card form" method="post" action="/admin/messages">${csrf(admin)}
         <h2>Send an update to all ${confirmed} confirmed attendees</h2>
         <p class="hint">Use for venue announcements, schedule changes and other important event updates. Event updates go to everyone registered; texts go only to people who opted in to SMS.</p>
-        <label>Subject<input name="subject" required maxlength="120" placeholder="Venue announced!"></label>
-        <label>Message<textarea name="message" rows="6" required maxlength="3000"></textarea></label>
+        <label>Subject<input name="subject" required maxlength="120" placeholder="Venue announced!" value="${pp ? ppSubject : ''}"></label>
+        <label>Message<textarea name="message" rows="7" required maxlength="3000">${pp ? ppMessage : ''}</textarea></label>
+        ${pp ? html`<p class="hint">Pre-filled with the postponement notice — edit anything before sending.</p>` : ''}
+        <label class="cbx"><input type="checkbox" name="flyer" value="postponed" ${pp ? raw('checked') : ''}> Include the “Postponed” flyer image <a href="/img/postponed.jpg" target="_blank" rel="noopener">(preview)</a></label>
         <label class="cbx"><input type="checkbox" name="sms"> Also text people who opted in to SMS</label>
         <label class="cbx"><input type="checkbox" name="confirm" required> I’ve double-checked this message</label>
         <button class="abtn abtn--primary">Send update</button></form>` : ''}
+      ${canSeePii(admin) ? html`<section class="card"><h2>Send it yourself (works without email setup)</h2>
+        <p class="hint">Copy these into Gmail’s <b>BCC</b> field (so people can’t see each other’s addresses) and attach the flyer, or text the flyer to the phone numbers. <a href="/img/postponed.jpg" download="klee-ruben-postponed.jpg">Download the postponed flyer</a> · <a href="/admin/rsvps.csv">Full list as CSV</a></p>
+        <label>All ${list.length} confirmed emails<textarea readonly rows="4">${list.map((x) => x.email).filter(Boolean).join(', ')}</textarea></label>
+        <label>Phone numbers (${list.filter((x) => x.phone_norm).length}) — only text people you have permission to text<textarea readonly rows="4">${list.filter((x) => x.phone_norm).map((x) => `${x.first_name} ${x.last_name}: ${x.phone_norm}${x.sms_opt_in ? '' : ' (no SMS opt-in)'}`).join('\n')}</textarea></label>
+      </section>` : ''}
       <section class="card"><h2>Delivery log</h2><div class="tablewrap"><table class="atbl"><thead><tr><th>When</th><th>Channel</th><th>Template</th><th>To</th><th>Status</th><th>Detail</th></tr></thead><tbody>
       ${log.map((n) => html`<tr><td>${fmtDate(n.created_at)}</td><td>${n.channel}</td><td>${n.template}</td><td class="small">${n.channel === 'email' ? email(admin, n.to_addr) : phone(admin, n.to_addr)}</td><td>${statusTag(n.status)}</td><td class="small">${n.error || n.provider_id || ''}</td></tr>`)}
       ${log.length ? '' : html`<tr><td colspan="6" class="empty">No messages yet.</td></tr>`}
@@ -676,7 +688,7 @@ export const adminRoutes = {
     const subject = clean(body.subject, 120), message = String(body.message || '').slice(0, 3000).trim();
     if (!subject || !message || body.confirm !== 'on') return redirect(res, `/admin/messages?err=${encodeURIComponent('Add a subject and message, and tick the confirmation box.')}`);
     const broadcastId = `${Date.now()}`;
-    const n = await broadcastUpdate({ subject, message, includeSms: body.sms === 'on', broadcastId });
+    const n = await broadcastUpdate({ subject, message, includeSms: body.sms === 'on', broadcastId, flyer: body.flyer === 'postponed' ? '/img/postponed.jpg' : '' });
     await audit({ actor: actor(admin), action: 'admin.broadcast', after: { subject, recipients: n, sms: body.sms === 'on' }, ipHash: ipHash(req) });
     processQueue().catch(() => {});
     redirect(res, '/admin/messages?msg=sent');
